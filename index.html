@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Threaded Task Scheduler</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .task-form {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .task-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .task-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 5px solid #667eea;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .task-item:hover {
+            transform: translateX(5px);
+        }
+
+        .task-item.pending {
+            border-left-color: #f39c12;
+        }
+
+        .task-item.running {
+            border-left-color: #3498db;
+            animation: pulse 2s infinite;
+        }
+
+        .task-item.completed {
+            border-left-color: #27ae60;
+        }
+
+        .task-item.failed {
+            border-left-color: #e74c3c;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .task-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .task-priority {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .priority-high {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .priority-medium {
+            background: #f39c12;
+            color: white;
+        }
+
+        .priority-low {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .task-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .task-info span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+            border-radius: 4px;
+        }
+
+        .worker-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+
+        .worker-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .worker-card.active {
+            border: 2px solid #27ae60;
+        }
+
+        .worker-card.idle {
+            border: 2px solid #95a5a6;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state svg {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ Multi-Threaded Task Scheduler</h1>
+            <p>Manage and execute tasks concurrently using Web Workers</p>
+        </div>
+
+        <div class="content">
+            <div class="task-form">
+                <h2 style="margin-bottom: 20px; color: #333;">Add New Task</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taskName">Task Name</label>
+                        <input type="text" id="taskName" placeholder="Enter task name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskDuration">Duration (seconds)</label>
+                        <input type="number" id="taskDuration" min="1" max="60" value="5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="taskPriority">Priority</label>
+                        <select id="taskPriority">
+                            <option value="high">High</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="addTask()">Add Task</button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-card">
+                    <h3 id="totalTasks">0</h3>
+                    <p>Total Tasks</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="runningTasks">0</h3>
+                    <p>Running Tasks</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="completedTasks">0</h3>
+                    <p>Completed Tasks</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="activeWorkers">0</h3>
+                    <p>Active Workers</p>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-success" onclick="startScheduler()">Start Scheduler</button>
+                <button class="btn btn-danger" onclick="stopScheduler()">Stop Scheduler</button>
+                <button class="btn btn-danger" onclick="clearCompleted()">Clear Completed</button>
+            </div>
+
+            <div class="worker-status" id="workerStatus"></div>
+
+            <h2 style="margin: 30px 0 20px 0; color: #333;">Task Queue</h2>
+            <div class="task-list" id="taskList">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p>No tasks yet. Add a task to get started!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Task Scheduler Application
+        class TaskScheduler {
+            constructor(maxWorkers = 4) {
+                this.maxWorkers = maxWorkers;
+                this.tasks = [];
+                this.workers = [];
+                this.taskIdCounter = 0;
+                this.schedulerRunning = false;
+                this.workerBlob = null;
+                this.initWorkerBlob();
+            }
+
+            initWorkerBlob() {
+                // Create worker code as a blob URL for true multi-threading
+                const workerCode = `
+                    self.onmessage = function(e) {
+                        const { taskId, duration } = e.data;
+                        const startTime = Date.now();
+                        const endTime = startTime + (duration * 1000);
+                        
+                        // Simulate work with progress updates
+                        const interval = setInterval(() => {
+                            const now = Date.now();
+                            const elapsed = now - startTime;
+                            const total = duration * 1000;
+                            const progress = Math.min(100, Math.round((elapsed / total) * 100));
+                            
+                            self.postMessage({
+                                type: 'progress',
+                                taskId: taskId,
+                                progress: progress
+                            });
+                            
+                            if (now >= endTime) {
+                                clearInterval(interval);
+                                self.postMessage({
+                                    type: 'complete',
+                                    taskId: taskId,
+                                    duration: duration
+                                });
+                            }
+                        }, 100);
+                    };
+                `;
+                
+                this.workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+            }
+
+            createWorker() {
+                if (this.workers.length >= this.maxWorkers) {
+                    return null;
+                }
+
+                const workerUrl = URL.createObjectURL(this.workerBlob);
+                const worker = new Worker(workerUrl);
+                worker.busy = false;
+                worker.currentTask = null;
+
+                worker.onmessage = (e) => {
+                    const { type, taskId, progress } = e.data;
+                    const task = this.tasks.find(t => t.id === taskId);
+
+                    if (task) {
+                        if (type === 'progress') {
+                            task.progress = progress;
+                            this.updateUI();
+                        } else if (type === 'complete') {
+                            task.status = 'completed';
+                            task.progress = 100;
+                            task.completedAt = new Date();
+                            worker.busy = false;
+                            worker.currentTask = null;
+                            this.updateUI();
+                            this.scheduleNext();
+                        }
+                    }
+                };
+
+                worker.onerror = (error) => {
+                    console.error('Worker error:', error);
+                    if (worker.currentTask) {
+                        const task = this.tasks.find(t => t.id === worker.currentTask);
+                        if (task) {
+                            task.status = 'failed';
+                            task.progress = 0;
+                        }
+                    }
+                    worker.busy = false;
+                    worker.currentTask = null;
+                    this.updateUI();
+                    this.scheduleNext();
+                };
+
+                this.workers.push(worker);
+                return worker;
+            }
+
+            addTask(name, duration, priority) {
+                const task = {
+                    id: this.taskIdCounter++,
+                    name: name,
+                    duration: duration,
+                    priority: priority,
+                    status: 'pending',
+                    progress: 0,
+                    createdAt: new Date(),
+                    startedAt: null,
+                    completedAt: null
+                };
+
+                this.tasks.push(task);
+                this.sortTasksByPriority();
+                this.updateUI();
+
+                if (this.schedulerRunning) {
+                    this.scheduleNext();
+                }
+            }
+
+            sortTasksByPriority() {
+                const priorityOrder = { high: 3, medium: 2, low: 1 };
+                this.tasks.sort((a, b) => {
+                    if (a.status !== b.status) {
+                        const statusOrder = { pending: 3, running: 2, completed: 1, failed: 0 };
+                        return statusOrder[b.status] - statusOrder[a.status];
+                    }
+                    if (a.status === 'pending' && b.status === 'pending') {
+                        return priorityOrder[b.priority] - priorityOrder[a.priority];
+                    }
+                    return 0;
+                });
+            }
+
+            scheduleNext() {
+                if (!this.schedulerRunning) return;
+
+                const pendingTask = this.tasks.find(t => t.status === 'pending');
+                if (!pendingTask) return;
+
+                let worker = this.workers.find(w => !w.busy);
+                if (!worker && this.workers.length < this.maxWorkers) {
+                    worker = this.createWorker();
+                }
+
+                if (worker && !worker.busy) {
+                    worker.busy = true;
+                    worker.currentTask = pendingTask.id;
+                    pendingTask.status = 'running';
+                    pendingTask.startedAt = new Date();
+                    worker.postMessage({
+                        taskId: pendingTask.id,
+                        duration: pendingTask.duration
+                    });
+                    this.updateUI();
+                }
+            }
+
+            start() {
+                if (this.schedulerRunning) return;
+                this.schedulerRunning = true;
+
+                // Create initial workers
+                for (let i = 0; i < this.maxWorkers; i++) {
+                    this.createWorker();
+                }
+
+                // Start scheduling
+                this.scheduleNext();
+                this.updateUI();
+            }
+
+            stop() {
+                this.schedulerRunning = false;
+                this.workers.forEach(worker => {
+                    if (worker.busy && worker.currentTask) {
+                        const task = this.tasks.find(t => t.id === worker.currentTask);
+                        if (task && task.status === 'running') {
+                            task.status = 'pending';
+                            task.progress = 0;
+                        }
+                    }
+                    worker.terminate();
+                });
+                this.workers = [];
+                this.updateUI();
+            }
+
+            clearCompleted() {
+                this.tasks = this.tasks.filter(t => t.status !== 'completed');
+                this.updateUI();
+            }
+
+            updateUI() {
+                this.renderTasks();
+                this.updateStats();
+                this.updateWorkerStatus();
+            }
+
+            updateStats() {
+                const total = this.tasks.length;
+                const running = this.tasks.filter(t => t.status === 'running').length;
+                const completed = this.tasks.filter(t => t.status === 'completed').length;
+                const active = this.workers.filter(w => w.busy).length;
+
+                document.getElementById('totalTasks').textContent = total;
+                document.getElementById('runningTasks').textContent = running;
+                document.getElementById('completedTasks').textContent = completed;
+                document.getElementById('activeWorkers').textContent = active;
+            }
+
+            updateWorkerStatus() {
+                const container = document.getElementById('workerStatus');
+                container.innerHTML = '';
+
+                for (let i = 0; i < this.maxWorkers; i++) {
+                    const worker = this.workers[i];
+                    const workerCard = document.createElement('div');
+                    workerCard.className = `worker-card ${worker && worker.busy ? 'active' : 'idle'}`;
+                    
+                    if (worker && worker.busy) {
+                        const task = this.tasks.find(t => t.id === worker.currentTask);
+                        workerCard.innerHTML = `
+                            <strong>Worker ${i + 1}</strong>
+                            <p style="margin-top: 5px; font-size: 0.9em;">Running: ${task ? task.name : 'Unknown'}</p>
+                        `;
+                    } else {
+                        workerCard.innerHTML = `
+                            <strong>Worker ${i + 1}</strong>
+                            <p style="margin-top: 5px; font-size: 0.9em; color: #999;">Idle</p>
+                        `;
+                    }
+                    
+                    container.appendChild(workerCard);
+                }
+            }
+
+            renderTasks() {
+                const container = document.getElementById('taskList');
+                
+                if (this.tasks.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                            <p>No tasks yet. Add a task to get started!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = '';
+                this.tasks.forEach(task => {
+                    const taskElement = document.createElement('div');
+                    taskElement.className = `task-item ${task.status}`;
+                    
+                    const timeInfo = task.completedAt 
+                        ? `Completed: ${task.completedAt.toLocaleTimeString()}`
+                        : task.startedAt 
+                        ? `Started: ${task.startedAt.toLocaleTimeString()}`
+                        : `Created: ${task.createdAt.toLocaleTimeString()}`;
+
+                    taskElement.innerHTML = `
+                        <div class="task-header">
+                            <span class="task-title">${task.name}</span>
+                            <span class="task-priority priority-${task.priority}">${task.priority.toUpperCase()}</span>
+                        </div>
+                        <div class="task-info">
+                            <span><strong>Status:</strong> ${task.status.toUpperCase()}</span>
+                            <span><strong>Duration:</strong> ${task.duration}s</span>
+                            <span><strong>${timeInfo}</strong></span>
+                        </div>
+                        ${task.status === 'running' || task.status === 'completed' ? `
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${task.progress}%"></div>
+                            </div>
+                        ` : ''}
+                    `;
+                    
+                    container.appendChild(taskElement);
+                });
+            }
+        }
+
+        // Initialize scheduler
+        const scheduler = new TaskScheduler(4);
+
+        // Global functions for UI
+        function addTask() {
+            const name = document.getElementById('taskName').value.trim();
+            const duration = parseInt(document.getElementById('taskDuration').value);
+            const priority = document.getElementById('taskPriority').value;
+
+            if (!name) {
+                alert('Please enter a task name');
+                return;
+            }
+
+            scheduler.addTask(name, duration, priority);
+            
+            // Clear form
+            document.getElementById('taskName').value = '';
+            document.getElementById('taskDuration').value = '5';
+            document.getElementById('taskPriority').value = 'medium';
+        }
+
+        function startScheduler() {
+            scheduler.start();
+        }
+
+        function stopScheduler() {
+            scheduler.stop();
+        }
+
+        function clearCompleted() {
+            scheduler.clearCompleted();
+        }
+
+        // Allow Enter key to add task
+        document.getElementById('taskName').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        document.getElementById('taskDuration').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        // Initial UI update
+        scheduler.updateUI();
+    </script>
+</body>
+</html>
